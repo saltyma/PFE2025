@@ -3,6 +3,7 @@ PySide6
 
 # Cryptographic operations
 cryptography
+pycryptodome
 pypdf
 
 # System utilities (for finding HSM drives)
@@ -12,15 +13,13 @@ psutil
 Flask
 flask-cors
 
-
-# HTTP client for User App to talk to the API
+# HTTP client for User and Verifier Apps
 requests
 
 # Production-grade WSGI server for the Flask API
 waitress
 
 # Serial communication for HSM devices & emulator
-
 pyserial
 
 # ASN.1 tooling for CSR construction/validation
@@ -28,4 +27,3 @@ asn1crypto
 
 # Testing
 pytest
-
