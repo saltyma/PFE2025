@@ -1,0 +1,33 @@
+/* Accent overrides for Verifier (green) */
+
+QPushButton#primary {
+    background-color: #16a34a;    /* green-600 */
+    border: 1px solid #15803d;    /* green-700 */
+    color: white;
+}
+QPushButton#primary:hover {
+    background-color: #15803d;
+}
+QPushButton#primary:pressed {
+    background-color: #166534;    /* green-800 */
+}
+
+/* Secondary buttons: subtle green outline */
+QPushButton#secondary {
+    background-color: transparent;
+    border: 1px solid #16a34a;
+    color: #16a34a;
+}
+QPushButton#secondary:hover {
+    background-color: rgba(22, 163, 74, 0.08);
+}
+QPushButton#secondary:pressed {
+    background-color: rgba(22, 163, 74, 0.14);
+}
+
+/* The "Flow." color in the logo is set inline in the QLabel HTML.
+   This rule is here if your base QSS targets #Logo color and you want a nudge.*/
+#Logo {
+    /* leave font/size as in base; we only ensure no blue override wins */
+    color: unset;
+}

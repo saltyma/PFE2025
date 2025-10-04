@@ -1,0 +1,509 @@
+/* user_app/styles/main_style.qss */
+
+/* --- Main Window & General Styles --- */
+QMainWindow {
+    background-color: #2c313a; /* Dark Charcoal */
+    font-family: Inter, Segoe UI, Arial, sans-serif;
+}
+
+QWidget {
+    color: #f0f0f0; /* Off-White Text */
+    font-size: 12pt;
+}
+
+/* --- Logo Style --- */
+QLabel#Logo {
+    font-size: 30pt;
+    font-weight: 800; /* Extra Bold */
+    padding: 10px 0;
+}
+
+QLabel#Tagline {
+    color: #a7adba;
+    font-size: 10pt;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+}
+
+/* --- Headings --- */
+QLabel#h1 {
+    font-size: 24pt;
+    font-weight: bold;
+}
+
+QLabel#h2 {
+    font-size: 18pt;
+    font-weight: 600; /* Semi-Bold */
+}
+
+QLabel#h3 {
+    font-size: 14pt;
+    font-weight: bold;
+}
+
+QLabel#HeroSubtitle {
+    color: #c3c8d4;
+    font-size: 11pt;
+}
+
+QLabel#DetailLabel {
+    color: #9da5b7;
+    font-size: 9pt;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+QLabel#HeroMetric {
+    color: #f0f0f0;
+    font-size: 14pt;
+    font-weight: 600;
+}
+
+QLabel#CardTitle {
+    font-size: 12pt;
+    font-weight: 700;
+}
+
+QLabel#CardMeta {
+    color: #d0d4de;
+    font-size: 10pt;
+}
+
+QLabel#CardHint {
+    color: #a7adba;
+    font-size: 10pt;
+}
+
+QLabel#CardHint[variant="info"] {
+    color: #a7adba;
+}
+
+QLabel#CardHint[variant="progress"] {
+    color: #6aa5e9;
+}
+
+QLabel#CardHint[variant="success"] {
+    color: #67d286;
+}
+
+QLabel#CardHint[variant="error"] {
+    color: #ff8a9b;
+}
+
+QLabel#Metric {
+    font-size: 32pt;
+    font-weight: 700;
+    color: #ffffff;
+}
+
+QLabel#StatusChip {
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-weight: 600;
+    background-color: rgba(255, 255, 255, 0.08);
+    color: #d7dbe4;
+}
+
+QLabel#StatusChip[status="good"] {
+    background-color: rgba(40, 167, 69, 0.2);
+    color: #67d286;
+}
+
+QLabel#StatusChip[status="warn"] {
+    background-color: rgba(255, 193, 7, 0.2);
+    color: #ffd56a;
+}
+
+QLabel#StatusChip[status="bad"] {
+    background-color: rgba(220, 53, 69, 0.2);
+    color: #ff8a9b;
+}
+
+QLabel#StatusChip[status="neutral"] {
+    background-color: rgba(255, 255, 255, 0.08);
+    color: #d7dbe4;
+}
+
+/* --- Main Layout Components --- */
+#Sidebar {
+    background-color: #3e4451; /* Slate Gray */
+    border-right: 1px solid #2c313a;
+}
+
+#ContentArea {
+    background-color: #2c313a; /* Dark Charcoal */
+}
+
+QFrame#LoginCard {
+    background-color: #343a46;
+    border-radius: 16px;
+    border: 1px solid rgba(82, 148, 226, 0.35);
+}
+
+QFrame#HeroCard {
+    background: qlineargradient(x1: 0, y1: 0, x2: 1, y2: 1,
+        stop: 0 #39465b,
+        stop: 1 #2d3545);
+    border-radius: 18px;
+    border: 1px solid rgba(82, 148, 226, 0.25);
+    padding: 28px;
+}
+
+QFrame#SummaryCard {
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    padding: 24px;
+    background-color: #353b4a;
+}
+
+QFrame#SummaryCard[tone="primary"] {
+    background: qlineargradient(x1: 0, y1: 0, x2: 1, y2: 1,
+        stop: 0 #2f3d55,
+        stop: 1 #253249);
+    border-color: rgba(82, 148, 226, 0.45);
+}
+
+QFrame#SummaryCard[tone="warning"] {
+    background: qlineargradient(x1: 0, y1: 0, x2: 1, y2: 1,
+        stop: 0 #3c3227,
+        stop: 1 #2e251d);
+    border-color: rgba(255, 193, 7, 0.45);
+}
+
+QFrame#SummaryCard[tone="neutral"] {
+    background: qlineargradient(x1: 0, y1: 0, x2: 1, y2: 1,
+        stop: 0 #353b4a,
+        stop: 1 #2b313d);
+    border-color: rgba(255, 255, 255, 0.08);
+}
+
+QFrame#SummaryCard[tone="info"] {
+    background: qlineargradient(x1: 0, y1: 0, x2: 1, y2: 1,
+        stop: 0 #2b3a4b,
+        stop: 1 #233041);
+    border-color: rgba(103, 201, 255, 0.45);
+}
+
+QFrame#SummaryCard[hover="true"] {
+    border: 1px solid rgba(82, 148, 226, 0.9);
+}
+
+/* --- Sidebar Navigation Buttons --- */
+#Sidebar QPushButton {
+    background-color: transparent;
+    border: none;
+    color: #a0a0a0; /* Light Gray */
+    text-align: left;
+    padding: 14px;
+    border-radius: 6px;
+    font-weight: 500;
+}
+
+#Sidebar QPushButton:hover {
+    background-color: #2c313a;
+    color: #f0f0f0;
+}
+
+#Sidebar QPushButton:checked {
+    background-color: #5294e2; /* Bright Blue */
+    color: #ffffff;
+    font-weight: bold;
+}
+
+/* --- Standard Buttons --- */
+QPushButton {
+    min-height: 38px;
+    padding: 8px 18px;
+    border-radius: 6px;
+    font-weight: bold;
+    outline: none;
+}
+
+/* Primary Action Button (for forms) */
+QPushButton#primary {
+    background-color: #5294e2;
+    color: #ffffff;
+    border: none;
+}
+
+QPushButton#primary:hover {
+    background-color: #6aa5e9;
+}
+
+QPushButton#primary:pressed {
+    background-color: #437fc1;
+}
+
+/* Secondary Action Button (for forms) */
+QPushButton#secondary {
+    background-color: transparent;
+    color: #5294e2;
+    border: 1px solid #5294e2;
+}
+
+QPushButton#secondary:hover {
+    background-color: rgba(82, 148, 226, 0.1);
+}
+
+QPushButton#secondary:pressed {
+    background-color: rgba(82, 148, 226, 0.2);
+}
+
+/* --- Input Fields --- */
+QLineEdit {
+    background-color: #3e4451;
+    border: 1px solid #2c313a;
+    border-radius: 4px;
+    padding: 8px;
+    color: #f0f0f0;
+}
+
+QLineEdit:focus {
+    border: 1px solid #5294e2;
+}
+
+/* --- NEW: ComboBox (Dropdown) Styles --- */
+QComboBox {
+    background-color: #3e4451;
+    border: 1px solid #2c313a;
+    border-radius: 4px;
+    padding: 8px;
+    min-height: 20px; /* Match QLineEdit effective height */
+}
+
+/* Style when the dropdown is open or focused */
+QComboBox:focus, QComboBox:on {
+    border: 1px solid #5294e2;
+}
+
+/* Style for the dropdown list that appears */
+QComboBox QAbstractItemView {
+    background-color: #3e4451;
+    border: 1px solid #5294e2;
+    selection-background-color: #5294e2;
+    selection-color: #ffffff;
+    outline: 0px; /* Remove the dotted border on selection */
+}
+
+/* Style for the dropdown arrow icon */
+QComboBox::down-arrow {
+    image: url(resources/down_arrow_light.svg);
+    width: 12px;
+    height: 12px;
+    subcontrol-origin: padding;
+    subcontrol-position: top right;
+    right: 8px; /* 8px from the right edge */
+}
+
+QComboBox::down-arrow:on { /* Tweak position when dropdown is open */
+    top: 1px;
+}
+
+/* --- Dialogs --- */
+QMessageBox {
+    background-color: #3e4451;
+    color: #f0f0f0;
+    border: 1px solid #5294e2;
+}
+
+QMessageBox QLabel {
+    color: #f0f0f0;
+    background-color: transparent;
+}
+
+QMessageBox QPushButton {
+    background-color: #5294e2;
+    color: #ffffff;
+    border: none;
+    border-radius: 4px;
+    padding: 6px 14px;
+    min-width: 90px;
+}
+
+QMessageBox QPushButton:hover {
+    background-color: #6aa5e9;
+}
+
+QMessageBox QPushButton:pressed {
+    background-color: #437fc1;
+}
+
+/* --- Labels --- */
+QLabel {
+    background-color: transparent;
+}
+
+QLabel#secondary_text {
+    color: #a0a0a0;
+    font-size: 10pt;
+}
+
+QLabel#error_text {
+    color: #dc3545; /* Red */
+    font-size: 10pt;
+    font-weight: bold;
+}
+
+/* --- Home Page Specific Styles --- */
+QFrame#info_card {
+    background-color: #3e4451;
+    border-radius: 8px;
+    border: 1px solid #2c313a;
+    padding: 20px;
+}
+
+QLabel#icon_large {
+    font-size: 60pt;
+    margin-bottom: 10px;
+}
+
+QPushButton[class="primary_action_button"] {
+    background-color: #5294e2;
+    color: #ffffff;
+    border: none;
+    border-radius: 8px;
+    font-size: 14pt;
+    font-weight: bold;
+    text-align: center;
+    padding: 15px 25px;
+    icon-size: 24px 24px;
+}
+
+QPushButton[class="primary_action_button"]:hover {
+    background-color: #6aa5e9;
+}
+
+QPushButton[class="primary_action_button"]:pressed {
+    background-color: #437fc1;
+}
+
+QPushButton#sign_button {
+    qproperty-icon: url(resources/sign_active.png);
+}
+
+QPushButton#view_button {
+    qproperty-icon: url(resources/verify_active.png);
+}
+
+QPushButton#DashboardAction {
+    background-color: #5294e2;
+    color: #ffffff;
+    border: none;
+    border-radius: 16px;
+    padding: 18px 22px;
+    font-size: 12pt;
+    font-weight: 600;
+    text-align: left;
+}
+
+QPushButton#DashboardAction:hover {
+    background-color: #6aa5e9;
+}
+
+QPushButton#DashboardAction:pressed {
+    background-color: #437fc1;
+}
+
+QPushButton#DashboardAction[role="secondary"] {
+    background-color: #3a4050;
+    border: 1px solid rgba(82, 148, 226, 0.5);
+}
+
+QPushButton#DashboardAction[role="secondary"]:hover {
+    background-color: #455066;
+}
+
+QPushButton#DashboardAction[role="outline"] {
+    background-color: transparent;
+    color: #5294e2;
+    border: 1px dashed rgba(82, 148, 226, 0.7);
+}
+
+QPushButton#DashboardAction[role="outline"]:hover {
+    background-color: rgba(82, 148, 226, 0.1);
+}
+
+/* --- Verification Result Dialog --- */
+VerificationResultDialog {
+    background-color: #3e4451;
+    border: 1px solid #2c313a;
+    border-radius: 8px;
+}
+
+QLabel#result_icon {
+    font-size: 28pt;
+}
+
+QFrame#details_frame {
+    background-color: #2c313a;
+    border-radius: 6px;
+    padding: 15px;
+}
+
+QFrame#details_frame QLabel {
+    font-size: 11pt;
+    color: #d0d0d0;
+}
+
+/* --- View Documents Page (Redesigned & Fixed) --- */
+
+/* Make the scroll area itself invisible */
+QScrollArea#document_scroll_area {
+    border: none;
+    background-color: transparent;
+}
+
+/* Style the container widget inside the scroll area to match the page background */
+QWidget#scroll_content {
+    background-color: #2c313a; /* Dark Charcoal, same as #ContentArea */
+}
+
+/* Style for each document item card */
+QFrame#document_card {
+    background-color: #3e4451; /* Slate Gray */
+    border-radius: 8px;
+    padding: 10px;
+    border: 1px solid #3e4451; /* Start with a matching border */
+}
+
+/* Hover effect for the card */
+QFrame#document_card:hover {
+    background-color: #4a505c; /* Slightly lighter gray */
+    border: 1px solid #5294e2; /* Highlight with blue border */
+}
+
+/* --- FIX: Ensure all labels inside the card remain transparent on hover --- */
+/* This rule is the key.
+   It makes sure the labels always show the background
+   of their direct parent (the card), not the window behind it.
+*/
+QFrame#document_card QLabel {
+    background-color: transparent;
+}
+
+/* Style for the document icon (emoji) */
+QLabel#file_icon {
+    font-size: 24pt;
+    min-width: 35px;
+    color: #a0a0a0; /* Light Gray */
+}
+
+/* Style for the main filename text */
+QLabel#filename_label {
+    font-size: 12pt;
+    font-weight: bold;
+    color: #f0f0f0; /* Off-White */
+}
+
+/* Style for the secondary timestamp text */
+QLabel#timestamp_label {
+    font-size: 9pt;
+    color: #a0a0a0; /* Light Gray */
+}
+
+/* Style for the signer's email on the right */
+QLabel#email_label {
+    color: #9da5b4; /* Muted gray-blue */
+    font-size: 10pt;
+}

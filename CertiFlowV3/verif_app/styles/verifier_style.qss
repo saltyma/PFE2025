@@ -1,0 +1,202 @@
+/* ===================================================================
+   CertiFlow Verifier - Unified Stylesheet
+   - Based on the professional CA Owner App style
+   - Uses a modern dark theme with a green accent color (#16a34a)
+   =================================================================== */
+
+/* --- Main Window & General Styles --- */
+QMainWindow, QDialog {
+    /* MODIFIED: Changed to a dark slate-green */
+    background-color: #232b2b;
+    font-family: Inter, Segoe UI, Arial, sans-serif;
+}
+
+QWidget {
+    color: #E0E0E0; /* Light Gray Text */
+    font-size: 11pt;
+}
+
+/* --- Logo Style (matches CA App) --- */
+QLabel#Logo {
+    font-size: 30pt;
+    font-weight: 800; /* Extra Bold */
+    padding: 10px 0;
+    text-align: center;
+}
+
+/* --- Headings --- */
+QLabel#h1 {
+    font-size: 24pt;
+    font-weight: bold;
+    color: #FFFFFF;
+}
+
+QLabel#h2 {
+    font-size: 18pt;
+    font-weight: 600; /* Semi-Bold */
+    color: #E0E0E0;
+}
+
+QLabel#secondary_text {
+    color: #A0A0A0;
+    font-size: 10pt;
+}
+
+/* --- Main Layout Components --- */
+#Sidebar {
+    /* MODIFIED: Changed to a complementary darker green-gray */
+    background-color: #1c2521;
+    border-right: 1px solid #232b2b;
+}
+
+#ContentArea {
+    /* MODIFIED: Changed to a dark slate-green */
+    background-color: #232b2b;
+}
+
+/* --- Sidebar Navigation Buttons (matches CA App) --- */
+#Sidebar QPushButton {
+    background-color: transparent;
+    border: none;
+    color: #A0A0A0; /* Muted Gray */
+    text-align: left;
+    padding: 14px;
+    border-radius: 6px;
+    font-weight: 500;
+}
+
+#Sidebar QPushButton:hover {
+    background-color: #38423c;
+    color: #FFFFFF;
+}
+
+#Sidebar QPushButton:checked {
+    background-color: #16a34a; /* Green Accent */
+    color: #FFFFFF;
+    font-weight: bold;
+}
+
+/* --- Standard Buttons --- */
+QPushButton {
+    min-height: 38px;
+    padding: 8px 18px;
+    border-radius: 6px;
+    font-weight: bold;
+    outline: none;
+}
+
+QPushButton#primary {
+    background-color: #16a34a;
+    color: #FFFFFF;
+    border: none;
+}
+QPushButton#primary:hover { background-color: #15803d; }
+QPushButton#primary:pressed { background-color: #166534; }
+
+QPushButton#secondary {
+    /* MODIFIED: Changed to a complementary green-gray */
+    background-color: #38423c;
+    color: #E0E0E0;
+    border: 1px solid #4a544f;
+}
+QPushButton#secondary:hover { background-color: #4a544f; }
+QPushButton#secondary:pressed { background-color: #2a312c; }
+
+
+/* --- Input Fields --- */
+QLineEdit {
+    /* MODIFIED: Changed to a complementary green-gray */
+    background-color: #2a312c;
+    border: 1px solid #4a544f;
+    border-radius: 6px;
+    padding: 10px;
+    color: #E0E0E0;
+}
+QLineEdit:focus { border: 1px solid #16a34a; }
+
+/* --- Content Cards/Frames --- */
+QFrame#ContentCard {
+    /* MODIFIED: Changed to a complementary green-gray */
+    background-color: #2a312c;
+    border: 1px solid #38423c;
+    border-radius: 8px;
+    padding: 25px;
+}
+
+/* --- History Page Table --- */
+QTableWidget {
+    /* MODIFIED: Changed to a complementary green-gray */
+    background-color: #2a312c;
+    alternate-background-color: #242b26;
+    border: 1px solid #38423c;
+    border-radius: 6px;
+    gridline-color: #38423c;
+    color: #E0E0E0;
+    font-size: 10pt;
+}
+QTableWidget::item {
+    padding: 10px; /* Increased padding for better spacing */
+    border: none;
+}
+QTableWidget::item:selected {
+    background-color: #16a34a;
+    color: #FFFFFF;
+}
+QHeaderView::section {
+    /* MODIFIED: Changed to the main background color */
+    background-color: #232b2b;
+    color: #E0E0E0;
+    padding: 8px;
+    border: none;
+    border-bottom: 1px solid #4a544f;
+    font-weight: bold;
+}
+
+/* --- Settings & Dialogs --- */
+QTextEdit#JsonViewer {
+    /* MODIFIED: Changed to the main background color */
+    background-color: #232b2b;
+    color: #E0E0E0;
+    border: 1px solid #38423c;
+    border-radius: 6px;
+    font-family: Consolas, monospace;
+}
+
+/* --- Scrollbars --- */
+QScrollBar:vertical, QScrollBar:horizontal {
+    border: none;
+    background: #2a312c;
+    width: 10px;
+    margin: 0px;
+}
+QScrollBar::handle:vertical, QScrollBar::handle:horizontal {
+    background: #4a544f;
+    border-radius: 5px;
+    min-height: 20px;
+}
+QScrollBar::handle:vertical:hover, QScrollBar::handle:horizontal:hover {
+    background: #16a34a;
+}
+QScrollBar::add-line, QScrollBar::sub-line {
+    height: 0px;
+    width: 0px;
+}
+
+/* === NEW: Splash Screen Styles === */
+#SplashPage {
+    /* Uses the darker sidebar color for a seamless transition */
+    background-color: #1c2521;
+}
+QLabel#SplashTitle {
+    font-size: 48pt;
+    font-weight: 800; /* Extra Bold */
+    color: #E0E0E0;
+}
+QLabel#SplashSubtitle {
+    font-size: 14pt;
+    color: #A0A0A0; /* Secondary text color */
+}
+QLabel#SplashHint {
+    font-size: 10pt;
+    color: #6a736d; /* Muted hint text */
+}

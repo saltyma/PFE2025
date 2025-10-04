@@ -1,0 +1,405 @@
+/* Main stylesheet for the CA Owner application. */
+/* ca_app/styles/ca_style.qss */
+
+/* --- Main Window & General Styles --- */
+QMainWindow, QDialog {
+    background-color: #1E1E1E; /* Very Dark Gray */
+    font-family: Inter, Segoe UI, Arial, sans-serif;
+}
+
+QWidget {
+    color: #E0E0E0; /* Light Gray Text */
+    font-size: 11pt;
+}
+
+/* --- Logo Style --- */
+QLabel#Logo {
+    font-size: 30pt;
+    font-weight: 800; /* Extra Bold */
+    padding: 10px 0;
+}
+
+/* --- Headings --- */
+QLabel#h1 {
+    font-size: 24pt;
+    font-weight: bold;
+    color: #FFFFFF;
+}
+
+QLabel#h2 {
+    font-size: 18pt;
+    font-weight: 600; /* Semi-Bold */
+    color: #E0E0E0;
+}
+
+/* --- Main Layout Components --- */
+#Sidebar {
+    background-color: #2D2D2D; /* Darker Gray */
+    border-right: 1px solid #1E1E1E;
+}
+
+#ContentArea {
+    background-color: #1E1E1E; /* Very Dark Gray */
+}
+
+/* --- Sidebar Navigation Buttons --- */
+#Sidebar QPushButton {
+    background-color: transparent;
+    border: none;
+    color: #A0A0A0; /* Muted Gray */
+    text-align: left;
+    padding: 14px;
+    border-radius: 6px;
+    font-weight: 500;
+}
+
+#Sidebar QPushButton:hover {
+    background-color: #3A3A3A;
+    color: #FFFFFF;
+}
+
+#Sidebar QPushButton:checked {
+    background-color: #9B2335; /* Crimson Accent */
+    color: #FFFFFF;
+    font-weight: bold;
+}
+
+/* --- Standard Buttons --- */
+QPushButton {
+    min-height: 38px;
+    padding: 8px 18px;
+    border-radius: 6px;
+    font-weight: bold;
+    outline: none;
+}
+
+/* Primary Action Button */
+QPushButton#primary {
+    background-color: #9B2335;
+    color: #FFFFFF;
+    border: none;
+}
+
+QPushButton#primary:hover { background-color: #B02A3D; }
+QPushButton#primary:pressed { background-color: #8A1F2E; }
+
+/* === [FIX] Secondary Action Button (Improved Visibility) === */
+QPushButton#secondary {
+    background-color: #3A3A3A; /* Solid dark gray background */
+    color: #E0E0E0;
+    border: 1px solid #4A4A4A;
+}
+QPushButton#secondary:hover { background-color: #4A4A4A; }
+QPushButton#secondary:pressed { background-color: #2D2D2D; }
+
+
+/* === [FIX] Danger Button (New Outline Style) === */
+QPushButton#danger {
+    background-color: transparent;
+    color: #E57373; /* Softer Red */
+    border: 1px solid #E57373;
+}
+QPushButton#danger:hover { background-color: rgba(229, 115, 115, 0.1); }
+QPushButton#danger:pressed { background-color: rgba(229, 115, 115, 0.2); }
+
+
+/* --- Input Fields --- */
+QLineEdit {
+    background-color: #2D2D2D;
+    border: 1px solid #4A4A4A;
+    border-radius: 6px;
+    padding: 10px;
+    color: #E0E0E0;
+    font-size: 11pt;
+}
+
+QLineEdit:focus { border: 1px solid #9B2335; }
+
+/* --- Labels --- */
+QLabel { background-color: transparent; }
+
+QLabel#secondary_text {
+    color: #A0A0A0;
+    font-size: 10pt;
+}
+
+QLabel#error_text {
+    color: #E57373; /* Softer Red */
+    font-size: 10pt;
+    font-weight: bold;
+}
+
+/* --- HSM Wait Page Specific --- */
+QLabel#wait_icon { font-size: 60pt; }
+
+/* --- Dashboard Stat Cards --- */
+#StatCard { border: 1px solid #3A3A3A; }
+
+QLabel#StatValue {
+    font-size: 28pt;
+    font-weight: 700;
+    color: #FFFFFF;
+}
+
+QLabel#StatTitle {
+    font-size: 11pt;
+    color: #A0A0A0;
+}
+
+/* --- Dashboard Request List --- */
+#RequestScrollArea {
+    border: 1px solid #2D2D2D;
+    border-radius: 6px;
+}
+
+QWidget#RequestListContainer { background-color: #1E1E1E; }
+
+#RequestItem {
+    background-color: #2D2D2D;
+    border-radius: 6px;
+    border: 1px solid #2D2D2D;
+}
+#RequestItem:hover {
+    background-color: #3A3A3A;
+    border: 1px solid #4A4A4A;
+}
+
+QLabel#ItemTitle { font-size: 12pt; font-weight: 600; }
+QLabel#ItemSubtitle { font-size: 9pt; color: #A0A0A0; }
+
+#RequestItem QPushButton { min-height: 32px; padding: 6px 14px; font-size: 10pt; }
+
+QPushButton#reject {
+    background-color: transparent;
+    color: #E57373;
+    border: 1px solid #E57373;
+}
+QPushButton#reject:hover { background-color: rgba(229,115,115,0.1); }
+
+/* --- Tables (Users + Admins) --- */
+QTableWidget, QTableView {
+    background-color: #2D2D2D;
+    alternate-background-color: #1E1E1E;
+    border: 1px solid #3A3A3A;
+    border-radius: 6px;
+    gridline-color: #3A3A3A;
+    color: #E0E0E0;
+    font-size: 14px;
+}
+
+QTableWidget::item {
+    padding: 8px;
+    border-bottom: 1px solid #3A3A3A;
+    background-color: #2D2D2D;
+}
+QTableWidget::item:selected {
+    background-color: #9B2335;
+    color: #FFFFFF;
+}
+QTableWidget:focus, QTableWidget::item:selected:focus {
+    outline: none;
+    border: none;
+}
+
+/* === [FIX] Horizontal header (Improved Contrast) === */
+QHeaderView::section {
+    background-color: #1E1E1E; /* Match window background for contrast */
+    color: #E0E0E0;
+    padding: 8px;
+    border: none;
+    border-bottom: 1px solid #4A4A4A;
+    font-weight: bold;
+}
+
+
+/* Top-left corner */
+QTableCornerButton::section {
+    background-color: #2D2D30;
+    border: 1px solid #444;
+    border-top-left-radius: 6px;
+}
+
+/* Hide vertical header (row numbers column) globally */
+QHeaderView::section:vertical {
+    width: 0px;
+    background: transparent;
+    border: none;
+}
+
+/* --- Status Pills --- */
+QLabel#StatusPill {
+    padding: 6px 12px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: bold;
+    color: white;
+}
+QLabel#StatusPill[status="verified"] { background-color: #38761d; }
+QLabel#StatusPill[status="pending"] { background-color: #f1c232; color: #1E1E1E; }
+QLabel#StatusPill[status="revoked"] { background-color: #660000; }
+QLabel#StatusPill[status="rejected"] { background-color: #434343; }
+
+/* --- Log Details Panel --- */
+QFrame#ActionPanel {
+    background-color: #171717;
+    border-left: 1px solid #2D2D2D;
+    border-top: 1px solid #1F1F1F;
+    border-bottom: 1px solid #1F1F1F;
+}
+
+#ActionPanel QLabel {
+    color: #E0E0E0;
+}
+
+QLabel#DetailLabel { color: #A0A0A0; font-size: 10pt; }
+
+QScrollArea#DetailScrollArea {
+    background-color: transparent;
+    border: none;
+}
+
+QFrame#DetailCardWrap {
+    background-color: transparent;
+}
+
+QFrame#DetailCard {
+    background-color: rgba(45, 45, 45, 0.85);
+    border: 1px solid #3A3A3A;
+    border-radius: 12px;
+    padding: 6px 0px;
+}
+
+QFrame#DetailCard QLabel#DetailCardKey {
+    font-size: 10pt;
+    font-weight: 600;
+    letter-spacing: 1.1px;
+    text-transform: uppercase;
+    color: #C7C7C7;
+}
+
+QFrame#DetailCard QLabel#DetailCardValue {
+    font-size: 11pt;
+    color: #F0F0F0;
+    line-height: 1.4em;
+}
+
+/* --- Text Areas --- */
+QTextEdit#JsonViewer {
+    background-color: #1E1E1E;
+    color: #E0E0E0;
+    border: 1px solid #3A3A3A;
+    border-radius: 6px;
+    font-family: Consolas, monospace;
+    font-size: 13px;
+    padding: 8px;
+}
+
+/* --- Scrollbars --- */
+QScrollBar:vertical, QScrollBar:horizontal {
+    background-color: #1E1E1E;
+    border-radius: 6px;
+}
+
+QScrollBar::handle:vertical, QScrollBar::handle:horizontal {
+    background: #9B2335;
+    border-radius: 6px;
+}
+
+QScrollBar::handle:vertical:hover, QScrollBar::handle:horizontal:hover {
+    background: #B02A3D;
+}
+
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical,
+QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
+    width: 0px; height: 0px;
+    background: none;
+}
+
+QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical,
+QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {
+    background: #1E1E1E;
+}
+
+/* --- Add Admin Wizard Dialog --- */
+QDialog {
+    background-color: #1E1E1E;
+}
+
+QFrame#WizardFrame {
+    background-color: #2D2D2D;
+    border-radius: 8px;
+    padding: 25px;
+    max-width: 500px;
+}
+
+QLabel#StepLabel {
+    font-size: 16pt;
+    font-weight: 600;
+    color: #FFFFFF;
+    padding-bottom: 5px;
+    border-bottom: 1px solid #4A4A4A;
+}
+
+QLabel#SubtitleLabel {
+    color: #A0A0A0;
+    font-size: 10pt;
+}
+
+QLabel#SummaryLabel {
+    font-size: 11pt;
+    padding: 5px;
+}
+
+QLabel#ErrorLabel {
+    color: #E57373; /* Softer Red */
+    font-size: 9pt;
+}
+
+/* --- Progress Bar --- */
+QProgressBar {
+    border: 1px solid #4A4A4A;
+    border-radius: 5px;
+    text-align: center;
+    background-color: #1E1E1E;
+    color: #E0E0E0;
+}
+
+QProgressBar::chunk {
+    background-color: #9B2335; /* Crimson Accent */
+    border-radius: 5px;
+}
+
+/* --- Settings Page --- */
+QFrame#SettingsCard {
+    background-color: #2D2D2D;
+    border-radius: 8px;
+    padding: 20px;
+    border: 1px solid #3A3A3A;
+}
+
+QFrame#SettingsCard QLabel {
+    font-size: 10pt;
+    color: #A0A0A0;
+}
+
+QFrame#SettingsCard QLabel#h2 {
+    font-size: 14pt;
+    font-weight: 600;
+    color: #E0E0E0;
+}
+
+QFrame#SettingsCard QPushButton {
+    max-width: 250px; /* Give buttons a max width */
+    margin-top: 5px;
+}
+
+/* Make the settings scroll area blend in */
+QScrollArea#SettingsScrollArea {
+    background-color: transparent;
+    border: none;
+}
+
+/* Make the content inside the scroll area transparent */
+QWidget#SettingsScrollContent {
+    background-color: transparent;
+}

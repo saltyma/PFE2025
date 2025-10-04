@@ -1,0 +1,9 @@
+{
+    "sender_email": "add your app email here",
+    "app_password": "enter your email app password here",
+    "token_secret": "1234567890POIUYTREZAQSDFGHJKLMWXCVBN",
+    "api_base_url": "http://127.0.0.1:7001",
+    "token_ttl_seconds": 86400,
+    "email_cooldown_seconds": 120
+    
+}

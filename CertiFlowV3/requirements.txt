@@ -1,0 +1,31 @@
+# GUI Framework
+PySide6
+
+# Cryptographic operations
+cryptography
+pypdf
+
+# System utilities (for finding HSM drives)
+psutil
+
+# CA API Server
+Flask
+flask-cors
+
+
+# HTTP client for User App to talk to the API
+requests
+
+# Production-grade WSGI server for the Flask API
+waitress
+
+# Serial communication for HSM devices & emulator
+
+pyserial
+
+# ASN.1 tooling for CSR construction/validation
+asn1crypto
+
+# Testing
+pytest
+
