@@ -66,7 +66,7 @@ pip install -r requirements.txt
 ```
 
 The `requirements.txt` file includes GUI, cryptography, USB serial, HTTP, and testing
-libraries required by every CertiFlow component.【F:CertiFlowV3/requirements.txt†L1-L31】
+libraries required by every CertiFlow component.
 
 After installing the dependencies you can initialize the local databases using the
 provided helper scripts (see [Initialize the desktop databases](#initialize-the-desktop-databases)).
@@ -99,7 +99,7 @@ If you simply want to evaluate the firmware, flash the ready-made image located 
 ### Access the HSM command channel over USB (PuTTY)
 
 The firmware enumerates as a USB CDC-ACM virtual COM port configured for 115200 bps, 8 data
-bits, no parity, and one stop bit.【F:STM32U5_USBX_crypto/USBX/App/ux_device_cdc_acm.c†L50-L112】
+bits, no parity, and one stop bit.
 
 1. After flashing, connect the board’s USB data port to your PC.
 2. Locate the assigned COM port (Windows Device Manager → “Ports (COM & LPT)”; on Linux
@@ -157,9 +157,9 @@ placeholders:
 
 | File | Key fields to update | Purpose |
 | --- | --- | --- |
-| `ca_app/config.json` | `sender_email`, `app_password`, `token_secret`, `api_base_url`, `email_cooldown_seconds` | Sets the SMTP credentials used to email activation links and the base URL that other apps should reach.【F:CertiFlowV3/ca_app/config.json†L1-L8】 |
-| `user_app/config.py` | `CA_API_URL` | Endpoint for the CA Owner API (use an IP/hostname reachable by the user machine).【F:CertiFlowV3/user_app/config.py†L1-L13】 |
-| `verif_app/config.py` | `CA_API_URL`, `LOG_SYNC_EMAIL`, optional `APP_VERSION` | Configure the API endpoint and the audit-log identity for the verifier application.【F:CertiFlowV3/verif_app/config.py†L1-L18】 |
+| `ca_app/config.json` | `sender_email`, `app_password`, `token_secret`, `api_base_url`, `email_cooldown_seconds` | Sets the SMTP credentials used to email activation links and the base URL that other apps should reach. |
+| `user_app/config.py` | `CA_API_URL` | Endpoint for the CA Owner API (use an IP/hostname reachable by the user machine). |
+| `verif_app/config.py` | `CA_API_URL`, `LOG_SYNC_EMAIL`, optional `APP_VERSION` | Configure the API endpoint and the audit-log identity for the verifier application. |
 
 *For multi-machine deployments* set `api_base_url`, `CA_API_URL`, and the email templates
 so that HTTPS domains (e.g., `https://ca.example.com`) are reachable by every node.
