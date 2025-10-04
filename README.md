@@ -120,16 +120,16 @@ second line payload (e.g., base64 data). The session times out automatically if 
 
 | Command | Syntax | Requires unlocked session? | Description & Notes |
 | --- | --- | --- | --- |
-| `INFO` | `INFO` | No | Returns the firmware identification banner (`OK HSM-EMU v0.1`).【F:STM32U5_USBX_crypto/Core/Src/hsm_proto.c†L337-L358】 |
-| `HSMID` | `HSMID` | No | Responds with a unique device identifier used during provisioning. Payload is on the next line.【F:STM32U5_USBX_crypto/Core/Src/hsm_proto.c†L344-L358】 |
-| `PING` | `PING` | No | Health check returning `OK PONG`. Useful for connectivity tests.【F:STM32U5_USBX_crypto/Core/Src/hsm_proto.c†L360-L363】 |
-| `UNLOCK` | `UNLOCK <PIN>` | No | Unlocks the keystore. On first use it sets the PIN and returns `OK NEWPIN`; subsequent successful unlocks return `OK UNLOCKED`. Five failed attempts trigger a temporary lockout (`ERR LOCKED`).【F:STM32U5_USBX_crypto/Core/Src/hsm_proto.c†L366-L468】 |
-| `LOGOUT` | `LOGOUT` | Yes (active session) | Ends the session and returns `OK BYE`. Use when you are done using the device.【F:STM32U5_USBX_crypto/Core/Src/hsm_proto.c†L365-L368】【F:STM32U5_USBX_crypto/Core/Src/hsm_proto.c†L701-L738】 |
-| `RESET` | `RESET` | Yes | Terminates the session and clears transient state (response `OK RESET`).【F:STM32U5_USBX_crypto/Core/Src/hsm_proto.c†L701-L738】 |
-| `FACTORY` | `FACTORY` | Yes | Wipes the stored PIN and key material. Only available while unlocked to avoid remote wipes. Use with caution; response `OK FACTORY` if successful.【F:STM32U5_USBX_crypto/Core/Src/hsm_proto.c†L616-L639】【F:STM32U5_USBX_crypto/Core/Src/hsm_proto.c†L701-L744】 |
-| `KEYGEN` | `KEYGEN EC P256` | Yes | Generates a new P-256 key pair if none exists and persists it. Returns `OK KEYGEN` or `OK KEYEXISTS` if a key is already present.【F:STM32U5_USBX_crypto/Core/Src/hsm_proto.c†L490-L533】 |
-| `PUBKEY` | `PUBKEY` | Yes | Sends a base64-encoded SubjectPublicKeyInfo for the resident key pair on the next line (`OK PUBKEY`).【F:STM32U5_USBX_crypto/Core/Src/hsm_proto.c†L535-L569】 |
-| `SIGN` | `SIGN SHA256 <64-hex-digest>` | Yes | Signs a SHA-256 digest with the stored private key and returns the DER-encoded ECDSA signature in base64 (`OK SIG`). Digest must be 64 hex characters.【F:STM32U5_USBX_crypto/Core/Src/hsm_proto.c†L571-L613】 |
+| `INFO` | `INFO` | No | Returns the firmware identification banner (`OK HSM-EMU v0.1`). |
+| `HSMID` | `HSMID` | No | Responds with a unique device identifier used during provisioning. Payload is on the next line. |
+| `PING` | `PING` | No | Health check returning `OK PONG`. Useful for connectivity tests. |
+| `UNLOCK` | `UNLOCK <PIN>` | No | Unlocks the keystore. On first use it sets the PIN and returns `OK NEWPIN`; subsequent successful unlocks return `OK UNLOCKED`. Five failed attempts trigger a temporary lockout (`ERR LOCKED`). |
+| `LOGOUT` | `LOGOUT` | Yes (active session) | Ends the session and returns `OK BYE`. Use when you are done using the device. |
+| `RESET` | `RESET` | Yes | Terminates the session and clears transient state (response `OK RESET`). |
+| `FACTORY` | `FACTORY` | Yes | Wipes the stored PIN and key material. Only available while unlocked to avoid remote wipes. Use with caution; response `OK FACTORY` if successful. |
+| `KEYGEN` | `KEYGEN EC P256` | Yes | Generates a new P-256 key pair if none exists and persists it. Returns `OK KEYGEN` or `OK KEYEXISTS` if a key is already present. |
+| `PUBKEY` | `PUBKEY` | Yes | Sends a base64-encoded SubjectPublicKeyInfo for the resident key pair on the next line (`OK PUBKEY`). |
+| `SIGN` | `SIGN SHA256 <64-hex-digest>` | Yes | Signs a SHA-256 digest with the stored private key and returns the DER-encoded ECDSA signature in base64 (`OK SIG`). Digest must be 64 hex characters. |
 
 ---
 
