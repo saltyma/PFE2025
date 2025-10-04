@@ -48,7 +48,7 @@ hardware, registering end users, and verifying signatures.
 | --- | --- |
 | Firmware toolchain | STM32CubeIDE 1.15 (or newer with STM32U5 support) and the ST-LINK/V3 drivers. |
 | Flasher (optional) | STM32CubeProgrammer if you prefer flashing the provided binary manually. |
-| Python | CPython 3.10 or newer on Windows, Linux, or macOS. All apps were tested on Windows 11 and Ubuntu 22.04. |
+| Python | CPython 3.10 or newer on Windows, Linux, or macOS. All apps were tested on Windows 10 and Ubuntu 22.04. |
 | Python package manager | `pip` (bundled with modern Python releases). |
 | Serial terminal | PuTTY (Windows) or screen/minicom (Linux/macOS) for interacting with the HSM console. |
 
