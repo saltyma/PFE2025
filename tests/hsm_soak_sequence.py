@@ -15,9 +15,19 @@ from typing import Deque, Dict, List, Optional, Tuple
 
 if __package__ in {None, ""}:
     sys.path.append(str(Path(__file__).resolve().parent))
-    from hsm_board_tester import SerialHSMClient, _sha256_digest  # type: ignore
+    from hsm_board_tester import (  # type: ignore
+        SerialHSMClient,
+        _sha256_digest,
+        interpret_keygen_response,
+        interpret_unlock_response,
+    )
 else:
-    from .hsm_board_tester import SerialHSMClient, _sha256_digest
+    from .hsm_board_tester import (
+        SerialHSMClient,
+        _sha256_digest,
+        interpret_keygen_response,
+        interpret_unlock_response,
+    )
 
 DEFAULT_DURATION = 2 * 60 * 60  # 2 hours
 DEFAULT_SAMPLE = Path("./fixtures/sample.pdf")
@@ -57,7 +67,9 @@ def weighted_choice(choices: List[Tuple[str, float]]) -> str:
     return choices[-1][0]
 
 
-def run_soak(args: argparse.Namespace) -> Tuple[List[SoakRecord], Dict[str, List[float]], Dict[str, int]]:
+def run_soak(
+    args: argparse.Namespace,
+) -> Tuple[List[SoakRecord], Dict[str, List[float]], Dict[str, int], Dict[str, str]]:
     artifact_dir = args.out
     artifact_dir.mkdir(parents=True, exist_ok=True)
 
@@ -77,6 +89,7 @@ def run_soak(args: argparse.Namespace) -> Tuple[List[SoakRecord], Dict[str, List
     frames: Deque[str] = deque(maxlen=50)
 
     client = SerialHSMClient(args.port, args.baud, args.timeout)
+    handshake = {"initial_unlock": "", "initial_keygen": "", "last_unlock": "", "last_keygen": ""}
     start_time = time.perf_counter()
     next_report = start_time + 300.0
     next_reopen = start_time + 900.0
@@ -84,9 +97,18 @@ def run_soak(args: argparse.Namespace) -> Tuple[List[SoakRecord], Dict[str, List
 
     try:
         client.open()
-        unlock_resp = client.transact(f"UNLOCK {args.pin}")
-        if unlock_resp.status != "OK":
-            raise RuntimeError(f"Initial unlock failed: {unlock_resp.status} {unlock_resp.head}")
+        unlock_resp = client.transact(f"UNLOCK {args.pin}", allow_additional=True)
+        unlock_status = interpret_unlock_response(unlock_resp)
+        if not unlock_status.success:
+            raise RuntimeError(f"Initial unlock failed: {unlock_status.detail}")
+        keygen_resp = client.transact("KEYGEN EC P256", allow_additional=True)
+        keygen_status = interpret_keygen_response(keygen_resp)
+        if not keygen_status.success:
+            raise RuntimeError(f"Initial key provisioning failed: {keygen_status.detail}")
+        handshake["initial_unlock"] = unlock_status.detail
+        handshake["initial_keygen"] = keygen_status.detail
+        handshake["last_unlock"] = unlock_status.detail
+        handshake["last_keygen"] = keygen_status.detail
 
         while time.perf_counter() - start_time < args.duration:
             now = time.perf_counter()
@@ -94,6 +116,16 @@ def run_soak(args: argparse.Namespace) -> Tuple[List[SoakRecord], Dict[str, List
                 client.close()
                 time.sleep(0.5)
                 client.open()
+                reopen_unlock = client.transact(f"UNLOCK {args.pin}", allow_additional=True)
+                reopen_status = interpret_unlock_response(reopen_unlock)
+                if not reopen_status.success:
+                    raise RuntimeError(f"Re-open unlock failed: {reopen_status.detail}")
+                reopen_keygen = client.transact("KEYGEN EC P256", allow_additional=True)
+                reopen_key_status = interpret_keygen_response(reopen_keygen)
+                if not reopen_key_status.success:
+                    raise RuntimeError(f"Re-open key provisioning failed: {reopen_key_status.detail}")
+                handshake["last_unlock"] = reopen_status.detail
+                handshake["last_keygen"] = reopen_key_status.detail
                 next_reopen = now + 900.0
 
             op = weighted_choice(operations)
@@ -106,7 +138,12 @@ def run_soak(args: argparse.Namespace) -> Tuple[List[SoakRecord], Dict[str, List
             cmd = op if op != "SIGN" else f"SIGN SHA256 {digest_hex}"
             t0 = time.perf_counter()
             try:
-                response = client.transact(cmd)
+                if op == "SIGN":
+                    response = client.transact(cmd, expect_payload=True)
+                elif op in {"HSMID", "PUBKEY"}:
+                    response = client.transact(cmd, expect_payload=True)
+                else:
+                    response = client.transact(cmd, allow_additional=True)
                 duration_ms = (time.perf_counter() - t0) * 1000.0
             except Exception as err:  # serial timeout or fatal
                 counters["timeouts"] += 1
@@ -117,6 +154,8 @@ def run_soak(args: argparse.Namespace) -> Tuple[List[SoakRecord], Dict[str, List
                 continue
 
             payload_text = response.body if response.body is not None else response.head
+            if op == "SIGN" and payload_text:
+                payload_text = "".join(payload_text.split())
             frame_msg = f"{time.time():.0f} CMD {cmd} -> {response.status} {response.head}"
             if response.body:
                 frame_msg += f" {response.body}"
@@ -151,7 +190,7 @@ def run_soak(args: argparse.Namespace) -> Tuple[List[SoakRecord], Dict[str, List
     finally:
         client.close()
 
-    return records, rtts, counters
+    return records, rtts, counters, handshake
 
 
 def write_outputs(
@@ -159,6 +198,7 @@ def write_outputs(
     records: List[SoakRecord],
     rtts: Dict[str, List[float]],
     counters: Dict[str, int],
+    handshake: Dict[str, str],
 ) -> None:
     if args.csv:
         csv_path = args.out / "hsm_soak.csv"
@@ -183,6 +223,7 @@ def write_outputs(
             "counters": counters,
             "latency_stats": drift,
             "notes": "No persistent failures" if counters["err"] == 0 else "Errors observed",
+            "handshake": handshake,
         }
         with summary_path.open("w") as handle:
             json.dump(summary, handle, indent=2)
@@ -194,12 +235,12 @@ def main(argv: Optional[List[str]] = None) -> int:
         raise FileNotFoundError(f"Sample payload missing: {args.sample}")
 
     try:
-        records, rtts, counters = run_soak(args)
+        records, rtts, counters, handshake = run_soak(args)
     except Exception as exc:
         print(str(exc), file=sys.stderr)
         return 1
 
-    write_outputs(args, records, rtts, counters)
+    write_outputs(args, records, rtts, counters, handshake)
     print(
         f"Soak complete: {len(records)} events, ok={counters['ok']} err={counters['err']} timeouts={counters['timeouts']}",
         file=sys.stderr,

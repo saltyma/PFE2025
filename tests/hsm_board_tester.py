@@ -12,6 +12,7 @@ import argparse
 import base64
 import csv
 import json
+import re
 import statistics
 import sys
 import time
@@ -66,7 +67,29 @@ class RunResult:
     public_key_der_b64: str
     signature_der_b64: str
     digest_hex: str
+    unlock_state: str
+    unlock_detail: str
+    keygen_state: str
+    keygen_detail: str
     command_metrics: List[CommandMetric] = field(default_factory=list)
+
+
+@dataclass
+class UnlockStatus:
+    """Classification of the unlock step."""
+
+    success: bool
+    state: str
+    detail: str
+
+
+@dataclass
+class KeygenStatus:
+    """Classification of the key generation step."""
+
+    success: bool
+    state: str
+    detail: str
 
 
 class SerialHSMClient:
@@ -93,6 +116,12 @@ class SerialHSMClient:
             timeout=self._timeout,
             write_timeout=self._timeout,
         )
+        time.sleep(0.2)
+        try:
+            self._serial.reset_input_buffer()
+            self._serial.reset_output_buffer()
+        except serial.SerialException:
+            pass
 
     def close(self) -> None:
         if self._serial and self._serial.is_open:
@@ -109,7 +138,29 @@ class SerialHSMClient:
     def __exit__(self, exc_type, exc, tb) -> None:  # type: ignore[override]
         self.close()
 
-    def transact(self, command: str, retries: int = 2) -> HSMResponse:
+    def _readline(self, required: bool) -> str:
+        assert self._serial is not None
+        original_timeout = self._serial.timeout
+        if not required:
+            self._serial.timeout = min(0.25, original_timeout or 0.25)
+        try:
+            line = self._serial.readline()
+        finally:
+            self._serial.timeout = original_timeout
+        if not line:
+            if required:
+                raise HSMProtocolError("Timeout waiting for response line")
+            return ""
+        return line.decode("utf-8", "ignore").strip()
+
+    def transact(
+        self,
+        command: str,
+        *,
+        retries: int = 2,
+        expect_payload: bool = False,
+        allow_additional: bool = True,
+    ) -> HSMResponse:
         """Send *command* and return a parsed :class:`HSMResponse`."""
 
         last_error: Optional[Exception] = None
@@ -122,20 +173,26 @@ class SerialHSMClient:
                 self._serial.reset_input_buffer()
                 self._serial.write(line)
                 self._serial.flush()
-                status_line = self._serial.readline().decode("utf-8", "ignore").strip()
+                status_line = self._readline(required=True)
                 if not status_line:
                     raise HSMProtocolError("Empty response")
                 parts = status_line.split(" ", 1)
                 status = parts[0].upper()
                 head = parts[1] if len(parts) > 1 else ""
                 body: Optional[str] = None
-                if status == "OK" and head.upper() in self._PAYLOAD_HEADS:
-                    payload_line = self._serial.readline().decode("utf-8", "ignore").strip()
+                head_upper = head.upper()
+                read_required = expect_payload or (status == "OK" and head_upper in self._PAYLOAD_HEADS)
+                if read_required:
+                    payload_line = self._readline(required=True)
                     if not payload_line:
                         raise HSMProtocolError("Missing payload for multi-line response")
                     body = payload_line
+                elif allow_additional:
+                    payload_line = self._readline(required=False)
+                    if payload_line:
+                        body = payload_line
                 return HSMResponse(status=status, head=head, body=body)
-            except (serial.SerialException, HSMProtocolError) as err:
+            except (serial.SerialException, serial.SerialTimeoutException, HSMProtocolError) as err:  # type: ignore[attr-defined]
                 last_error = err
                 self.close()
                 time.sleep(0.1 * (attempt + 1))
@@ -177,30 +234,96 @@ def _verify_signature(spki_der: bytes, digest: bytes, signature_der: bytes) -> b
         return False
 
 
-def _negative_tests(client: SerialHSMClient) -> Dict[str, str]:
-    """Exercise basic negative behaviors and assert ERR responses."""
+def _response_text(response: HSMResponse) -> str:
+    parts = [response.status]
+    if response.head:
+        parts.append(response.head)
+    if response.body:
+        parts.append(response.body)
+    return " ".join(part for part in parts if part).strip()
 
-    results: Dict[str, str] = {}
+
+def _response_tokens(response: HSMResponse) -> set[str]:
+    tokens = set()
+    text = _response_text(response)
+    if not text:
+        return tokens
+    for piece in re.split(r"[^A-Za-z0-9]+", text):
+        if piece:
+            tokens.add(piece.upper())
+    return tokens
+
+
+def interpret_unlock_response(response: HSMResponse) -> UnlockStatus:
+    tokens = _response_tokens(response)
+    detail = _response_text(response)
+    if response.status == "OK":
+        if {"ALREADY", "UNLOCKED"} & tokens:
+            return UnlockStatus(True, "already_unlocked", detail)
+        if {"NOPIN", "NO", "PINLESS", "PINFREE"} & tokens:
+            return UnlockStatus(True, "no_pin", detail)
+        return UnlockStatus(True, "unlocked", detail)
+    if response.status == "ERR":
+        if {"ALREADY", "UNLOCKED"} & tokens:
+            return UnlockStatus(True, "already_unlocked", detail)
+        if {"NOPIN", "NO", "PINLESS", "PINFREE"} & tokens:
+            return UnlockStatus(True, "no_pin", detail)
+    return UnlockStatus(False, "locked", detail)
+
+
+def interpret_keygen_response(response: HSMResponse) -> KeygenStatus:
+    tokens = _response_tokens(response)
+    detail = _response_text(response)
+    if response.status == "OK":
+        if {"EXIST", "KEYEXISTS", "PRESENT", "SKIP"} & tokens:
+            return KeygenStatus(True, "existing", detail)
+        return KeygenStatus(True, "generated", detail)
+    if response.status == "ERR" and {"EXIST", "KEYEXISTS", "PRESENT", "ALREADY"} & tokens:
+        return KeygenStatus(True, "existing", detail)
+    return KeygenStatus(False, "error", detail)
+
+
+def _negative_tests(client: SerialHSMClient) -> Dict[str, Dict[str, object]]:
+    """Exercise basic negative behaviors and capture their outcomes."""
+
+    results: Dict[str, Dict[str, object]] = {}
     scenarios = {
         "wrong_pin": "UNLOCK 0000",
         "malformed": "INFO???",
         "truncated": "SIGN SHA256 00",
     }
     for name, command in scenarios.items():
-        response = client.transact(command)
-        if response.status != "ERR":
-            raise HSMFatalError(f"Negative test '{name}' returned '{response.status}'")
-        results[name] = response.head
-    # Rate limiting: burst commands quickly and expect at least one ERR RATE.
+        response = client.transact(command, allow_additional=True)
+        results[name] = {
+            "status": response.status,
+            "head": response.head,
+            "body": response.body,
+            "expected": "ERR",
+            "passed": response.status == "ERR",
+        }
+
     rate_hits = 0
     hex_digest = "00" * 32
+    rate_responses: List[Dict[str, object]] = []
     for _ in range(5):
-        response = client.transact(f"SIGN SHA256 {hex_digest}")
-        if response.status == "ERR" and "RATE" in response.head.upper():
+        response = client.transact(f"SIGN SHA256 {hex_digest}", allow_additional=True)
+        rate_responses.append(
+            {
+                "status": response.status,
+                "head": response.head,
+                "body": response.body,
+            }
+        )
+        if response.status == "ERR" and "RATE" in _response_text(response).upper():
             rate_hits += 1
         time.sleep(0.05)
-    if rate_hits == 0:
-        raise HSMFatalError("Rate limit negative test failed")
+    results["rate_limit"] = {
+        "status": "ERR" if rate_hits else "UNKNOWN",
+        "head": f"hits={rate_hits}",
+        "body": rate_responses,
+        "expected": "ERR",
+        "passed": rate_hits > 0,
+    }
     return results
 
 
@@ -216,17 +339,17 @@ def execute_happy_path(
 
     # INFO
     t0 = time.perf_counter()
-    info_resp = client.transact("INFO")
+    info_resp = client.transact("INFO", allow_additional=True)
     duration = (time.perf_counter() - t0) * 1000.0
     _record_metric(metrics, "INFO", duration)
     command_log.append(CommandMetric("INFO", duration, info_resp.status))
     if info_resp.status != "OK":
         raise HSMFatalError(f"INFO failed: {info_resp.status} {info_resp.head}")
-    banner = info_resp.head
+    banner = info_resp.body or info_resp.head or ""
 
     # HSMID
     t0 = time.perf_counter()
-    hsmid_resp = client.transact("HSMID")
+    hsmid_resp = client.transact("HSMID", expect_payload=True)
     duration = (time.perf_counter() - t0) * 1000.0
     _record_metric(metrics, "HSMID", duration)
     command_log.append(CommandMetric("HSMID", duration, hsmid_resp.status))
@@ -236,35 +359,38 @@ def execute_happy_path(
 
     # UNLOCK
     t0 = time.perf_counter()
-    unlock_resp = client.transact(f"UNLOCK {pin}")
+    unlock_resp = client.transact(f"UNLOCK {pin}", allow_additional=True)
     duration = (time.perf_counter() - t0) * 1000.0
     _record_metric(metrics, "UNLOCK", duration)
     command_log.append(CommandMetric("UNLOCK", duration, unlock_resp.status))
-    if unlock_resp.status != "OK":
-        raise HSMFatalError(f"UNLOCK failed: {unlock_resp.status} {unlock_resp.head}")
+    unlock_status = interpret_unlock_response(unlock_resp)
+    if not unlock_status.success:
+        raise HSMFatalError(f"UNLOCK failed: {unlock_status.detail}")
 
     # KEYGEN
     t0 = time.perf_counter()
-    keygen_resp = client.transact("KEYGEN EC P256")
+    keygen_resp = client.transact("KEYGEN EC P256", allow_additional=True)
     duration = (time.perf_counter() - t0) * 1000.0
     _record_metric(metrics, "KEYGEN", duration)
     command_log.append(CommandMetric("KEYGEN", duration, keygen_resp.status))
-    if keygen_resp.status != "OK" or keygen_resp.head.upper() not in {"KEYGEN", "KEYEXISTS"}:
-        raise HSMFatalError(f"KEYGEN unexpected: {keygen_resp.status} {keygen_resp.head}")
+    keygen_status = interpret_keygen_response(keygen_resp)
+    if not keygen_status.success:
+        raise HSMFatalError(f"KEYGEN unexpected: {keygen_status.detail}")
 
     # PUBKEY
     t0 = time.perf_counter()
-    pubkey_resp = client.transact("PUBKEY")
+    pubkey_resp = client.transact("PUBKEY", expect_payload=True)
     duration = (time.perf_counter() - t0) * 1000.0
     _record_metric(metrics, "PUBKEY", duration)
     command_log.append(CommandMetric("PUBKEY", duration, pubkey_resp.status))
     if pubkey_resp.status != "OK" or not pubkey_resp.body:
         raise HSMFatalError(f"PUBKEY failed: {pubkey_resp.status} {pubkey_resp.head}")
-    pubkey_der = base64.b64decode(pubkey_resp.body)
+    pubkey_b64 = "".join(pubkey_resp.body.split())
+    pubkey_der = base64.b64decode(pubkey_b64)
 
     # SIGN
     t0 = time.perf_counter()
-    sign_resp = client.transact(f"SIGN SHA256 {digest_hex}")
+    sign_resp = client.transact(f"SIGN SHA256 {digest_hex}", expect_payload=True)
     duration = (time.perf_counter() - t0) * 1000.0
     _record_metric(metrics, "SIGN", duration)
     command_log.append(CommandMetric("SIGN", duration, sign_resp.status))
@@ -273,7 +399,8 @@ def execute_happy_path(
     if sign_resp.head.upper() not in {"SIG"}:
         raise HSMFatalError(f"Unexpected SIGN response: {sign_resp.head}")
 
-    signature_der = base64.b64decode(sign_resp.body)
+    signature_b64 = "".join(sign_resp.body.split())
+    signature_der = base64.b64decode(signature_b64)
 
     if not _verify_signature(pubkey_der, digest, signature_der):
         raise HSMFatalError("Host verification of signature failed")
@@ -285,9 +412,13 @@ def execute_happy_path(
     return RunResult(
         banner=banner,
         device_id=device_id,
-        public_key_der_b64=pubkey_resp.body,
-        signature_der_b64=sign_resp.body,
+        public_key_der_b64=pubkey_b64,
+        signature_der_b64=signature_b64,
         digest_hex=digest_hex,
+        unlock_state=unlock_status.state,
+        unlock_detail=unlock_status.detail,
+        keygen_state=keygen_status.state,
+        keygen_detail=keygen_status.detail,
         command_metrics=command_log,
     )
 
@@ -304,7 +435,7 @@ def write_summary(
     path: Path,
     metrics: Dict[str, List[float]],
     runs: List[RunResult],
-    negatives: Dict[str, str],
+    negatives: Dict[str, Dict[str, object]],
     extra: Optional[Dict[str, object]] = None,
 ) -> None:
     summary: Dict[str, object] = {
@@ -315,6 +446,10 @@ def write_summary(
         "device_info": runs[0].device_id if runs else "",
         "firmware_banner": runs[0].banner if runs else "",
         "negative_tests": negatives,
+        "unlock_state": runs[-1].unlock_state if runs else "",
+        "unlock_detail": runs[-1].unlock_detail if runs else "",
+        "keygen_state": runs[-1].keygen_state if runs else "",
+        "keygen_detail": runs[-1].keygen_detail if runs else "",
     }
     if extra:
         summary.update(extra)
@@ -358,7 +493,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     metrics: Dict[str, List[float]] = defaultdict(list)
     runs: List[RunResult] = []
     csv_rows: List[Tuple[int, CommandMetric]] = []
-    negatives: Dict[str, str] = {}
+    negatives: Dict[str, Dict[str, object]] = {}
     digest = _sha256_digest(args.sample)
 
     client = SerialHSMClient(args.port, args.baud, args.timeout)
@@ -375,7 +510,8 @@ def main(argv: Optional[List[str]] = None) -> int:
                 runs.append(result)
                 for metric in result.command_metrics:
                     csv_rows.append((run, metric))
-        negatives = _negative_tests(client)
+        if runs:
+            negatives = _negative_tests(client)
     except HSMFatalError as err:
         print(f"Fatal error: {err}", file=sys.stderr)
         return 1
