@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import base64
 import csv
 import json
 import random
@@ -35,9 +34,9 @@ class SoakRecord:
 
 def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="HSM soak and stability sequence")
-    parser.add_argument("--port", required=True, help="Serial port for the HSM")
+    parser.add_argument("--port", default="COM10", help="Serial port for the HSM (default: COM10)")
     parser.add_argument("--baud", type=int, default=115200)
-    parser.add_argument("--pin", required=True)
+    parser.add_argument("--pin", default="1234")
     parser.add_argument("--timeout", type=float, default=2.4)
     parser.add_argument("--duration", type=int, default=DEFAULT_DURATION, help="Duration in seconds")
     parser.add_argument("--out", type=Path, default=Path("./artifacts"))
@@ -62,7 +61,7 @@ def run_soak(args: argparse.Namespace) -> Tuple[List[SoakRecord], Dict[str, List
     artifact_dir = args.out
     artifact_dir.mkdir(parents=True, exist_ok=True)
 
-    digest_b64 = base64.b64encode(_sha256_digest(args.sample)).decode("ascii")
+    digest_hex = _sha256_digest(args.sample).hex()
 
     operations = [
         ("INFO", 0.10),
@@ -85,9 +84,9 @@ def run_soak(args: argparse.Namespace) -> Tuple[List[SoakRecord], Dict[str, List
 
     try:
         client.open()
-        status, payload = client.transact(f"UNLOCK {args.pin}")
-        if status != "OK":
-            raise RuntimeError(f"Initial unlock failed: {status} {payload}")
+        unlock_resp = client.transact(f"UNLOCK {args.pin}")
+        if unlock_resp.status != "OK":
+            raise RuntimeError(f"Initial unlock failed: {unlock_resp.status} {unlock_resp.head}")
 
         while time.perf_counter() - start_time < args.duration:
             now = time.perf_counter()
@@ -104,10 +103,10 @@ def run_soak(args: argparse.Namespace) -> Tuple[List[SoakRecord], Dict[str, List
                 records.append(SoakRecord(time.time(), op, delay * 1000.0, "OK", ""))
                 continue
 
-            cmd = op if op != "SIGN" else f"SIGN {digest_b64}"
+            cmd = op if op != "SIGN" else f"SIGN SHA256 {digest_hex}"
             t0 = time.perf_counter()
             try:
-                status, payload = client.transact(cmd)
+                response = client.transact(cmd)
                 duration_ms = (time.perf_counter() - t0) * 1000.0
             except Exception as err:  # serial timeout or fatal
                 counters["timeouts"] += 1
@@ -117,20 +116,24 @@ def run_soak(args: argparse.Namespace) -> Tuple[List[SoakRecord], Dict[str, List
                     raise
                 continue
 
-            frames.append(f"{time.time():.0f} CMD {cmd} -> {status} {payload}")
-            records.append(SoakRecord(time.time(), op, duration_ms, status, payload))
-            if status == "OK":
+            payload_text = response.body if response.body is not None else response.head
+            frame_msg = f"{time.time():.0f} CMD {cmd} -> {response.status} {response.head}"
+            if response.body:
+                frame_msg += f" {response.body}"
+            frames.append(frame_msg)
+            records.append(SoakRecord(time.time(), op, duration_ms, response.status, payload_text))
+            if response.status == "OK":
                 counters["ok"] += 1
                 rtts[op].append(duration_ms)
-                if op == "SIGN" and payload:
+                if op == "SIGN" and payload_text:
                     # basic sanity: ensure payload resembles base64
-                    if len(payload.strip()) < 10:
+                    if len(payload_text.strip()) < 10:
                         counters["err"] += 1
                 time.sleep(delay)
             else:
                 counters["err"] += 1
                 if counters["err"] >= 5:
-                    raise RuntimeError(f"Persistent ERR responses: last={payload}")
+                    raise RuntimeError(f"Persistent ERR responses: last={payload_text}")
 
             if time.perf_counter() >= next_report:
                 avg = {k: (sum(v) / len(v) if v else 0.0) for k, v in rtts.items()}

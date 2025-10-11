@@ -175,9 +175,9 @@ def _summary_stats(values: Iterable[float]) -> Dict[str, float]:
 
 def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="End-to-end CMS evaluation")
-    parser.add_argument("--port", required=True, help="USB CDC-ACM port for the HSM")
+    parser.add_argument("--port", default="COM10", help="USB CDC-ACM port for the HSM (default: COM10)")
     parser.add_argument("--baud", type=int, default=115200)
-    parser.add_argument("--pin", required=True, help="PIN for unlocking the HSM")
+    parser.add_argument("--pin", default="1234", help="PIN for unlocking the HSM (default: 1234)")
     parser.add_argument("--timeout", type=float, default=2.4)
     parser.add_argument("--trust", type=Path, default=DEFAULT_TRUST)
     parser.add_argument("--pdf", type=Path, default=DEFAULT_PDF)
@@ -217,9 +217,8 @@ def main(argv: Optional[List[str]] = None) -> int:
                 metrics["digest"].append(digest_duration)
                 stage_rows.append(StageTiming(run, "digest", digest_duration, "OK"))
 
-                digest_b64 = base64.b64encode(digest).decode("ascii")
                 try:
-                    result = execute_happy_path(client, args.pin, digest_b64, defaultdict(list))
+                    result = execute_happy_path(client, args.pin, digest, defaultdict(list))
                 except HSMFatalError as err:
                     print(f"Run {run} HSM failure: {err}", file=sys.stderr)
                     return 1
