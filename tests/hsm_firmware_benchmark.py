@@ -9,7 +9,10 @@ with structured benchmarking, persistence of key artefacts, and rich reporting.
 
 Example invocation (from `tests/`):
 
-    python hsm_firmware_benchmark.py --csv --json --text --out ./artifacts
+    python hsm_firmware_benchmark.py --out ./artifacts
+
+Reports (CSV/JSON/text) are produced automatically; pass `--no-csv`,
+`--no-json`, or `--no-text` to disable any of them.
 
 Requirements:
   * pyserial (`pip install pyserial`)
@@ -438,6 +441,7 @@ def build_report(
             )
             for record in records:
                 writer.writerow(record.as_csv_row())
+        logging.info("Wrote CSV metrics to %s", csv_path)
 
     summary: Dict[str, object] = {
         "metadata": metadata,
@@ -482,6 +486,7 @@ def build_report(
         summary_path.parent.mkdir(parents=True, exist_ok=True)
         with summary_path.open("w", encoding="utf-8") as handle:
             json.dump(summary, handle, indent=2)
+        logging.info("Wrote JSON summary to %s", summary_path)
 
     if text_path is not None:
         text_path.parent.mkdir(parents=True, exist_ok=True)
@@ -535,6 +540,7 @@ def build_report(
             lines.append("")
         with text_path.open("w", encoding="utf-8") as handle:
             handle.write("\n".join(lines))
+        logging.info("Wrote text report to %s", text_path)
 
 
 def run_sequence(args: argparse.Namespace) -> int:
@@ -942,9 +948,45 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     parser.add_argument("--serial-read-timeout", type=float, default=0.5, help="Readline timeout when waiting for data")
     parser.add_argument("--logout-between-runs", action="store_true", help="Issue LOGOUT between runs to measure cold unlock performance")
     parser.add_argument("--repeat-info", action="store_true", help="Request INFO on every run instead of just the first")
-    parser.add_argument("--csv", action="store_true", help="Write per-command metrics CSV")
-    parser.add_argument("--json", action="store_true", help="Write JSON summary report")
-    parser.add_argument("--text", action="store_true", help="Write human-readable text report")
+    parser.add_argument(
+        "--csv",
+        dest="csv",
+        action="store_true",
+        default=True,
+        help="Write per-command metrics CSV (default: enabled)",
+    )
+    parser.add_argument(
+        "--no-csv",
+        dest="csv",
+        action="store_false",
+        help="Disable CSV output",
+    )
+    parser.add_argument(
+        "--json",
+        dest="json",
+        action="store_true",
+        default=True,
+        help="Write JSON summary report (default: enabled)",
+    )
+    parser.add_argument(
+        "--no-json",
+        dest="json",
+        action="store_false",
+        help="Disable JSON summary output",
+    )
+    parser.add_argument(
+        "--text",
+        dest="text",
+        action="store_true",
+        default=True,
+        help="Write human-readable text report (default: enabled)",
+    )
+    parser.add_argument(
+        "--no-text",
+        dest="text",
+        action="store_false",
+        help="Disable text report output",
+    )
     parser.add_argument("--csv-path", type=Path, default=_DEFAULT_OUT / "benchmark_metrics.csv", help="Path to the CSV output file")
     parser.add_argument("--json-path", type=Path, default=_DEFAULT_OUT / "benchmark_summary.json", help="Path to the JSON summary file")
     parser.add_argument("--text-path", type=Path, default=_DEFAULT_OUT / "benchmark_report.txt", help="Path to the human-readable report")
