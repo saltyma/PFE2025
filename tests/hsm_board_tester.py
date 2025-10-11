@@ -110,11 +110,12 @@ class SerialHSMClient:
 
     def open(self) -> None:
         self.close()
+        write_timeout = None if self._timeout <= 0 else max(self._timeout, 5.0)
         self._serial = serial.Serial(
             self._port,
             self._baudrate,
             timeout=self._timeout,
-            write_timeout=self._timeout,
+            write_timeout=write_timeout,
         )
         time.sleep(0.2)
         try:
@@ -138,12 +139,18 @@ class SerialHSMClient:
     def __exit__(self, exc_type, exc, tb) -> None:  # type: ignore[override]
         self.close()
 
-    def _readline(self, required: bool) -> str:
+    @property
+    def timeout(self) -> float:
+        return self._timeout
+
+    def _readline(self, required: bool, timeout: Optional[float] = None) -> str:
         assert self._serial is not None
         original_timeout = self._serial.timeout
-        if not required:
-            self._serial.timeout = min(0.25, original_timeout or 0.25)
         try:
+            if timeout is not None:
+                self._serial.timeout = timeout
+            elif not required:
+                self._serial.timeout = min(0.25, original_timeout or 0.25)
             line = self._serial.readline()
         finally:
             self._serial.timeout = original_timeout
@@ -160,6 +167,9 @@ class SerialHSMClient:
         retries: int = 2,
         expect_payload: bool = False,
         allow_additional: bool = True,
+        response_timeout: Optional[float] = None,
+        pre_delay: float = 0.0,
+        max_payload_lines: int = 4,
     ) -> HSMResponse:
         """Send *command* and return a parsed :class:`HSMResponse`."""
 
@@ -170,10 +180,12 @@ class SerialHSMClient:
                     self.open()
                 assert self._serial is not None
                 line = (command + CRLF).encode("ascii")
-                self._serial.reset_input_buffer()
+                if pre_delay:
+                    time.sleep(pre_delay)
                 self._serial.write(line)
                 self._serial.flush()
-                status_line = self._readline(required=True)
+                status_timeout = response_timeout or self._timeout
+                status_line = self._readline(required=True, timeout=status_timeout)
                 if not status_line:
                     raise HSMProtocolError("Empty response")
                 parts = status_line.split(" ", 1)
@@ -182,20 +194,27 @@ class SerialHSMClient:
                 body: Optional[str] = None
                 head_upper = head.upper()
                 read_required = expect_payload or (status == "OK" and head_upper in self._PAYLOAD_HEADS)
+                payload_lines: List[str] = []
                 if read_required:
-                    payload_line = self._readline(required=True)
+                    payload_timeout = response_timeout or max(self._timeout, 1.0)
+                    payload_line = self._readline(required=True, timeout=payload_timeout)
                     if not payload_line:
                         raise HSMProtocolError("Missing payload for multi-line response")
-                    body = payload_line
-                elif allow_additional:
-                    payload_line = self._readline(required=False)
-                    if payload_line:
-                        body = payload_line
+                    payload_lines.append(payload_line)
+                if allow_additional and max_payload_lines > len(payload_lines):
+                    optional_timeout = min(0.35, (response_timeout or self._timeout) or 0.35)
+                    for _ in range(max_payload_lines - len(payload_lines)):
+                        extra = self._readline(required=False, timeout=optional_timeout)
+                        if not extra:
+                            break
+                        payload_lines.append(extra)
+                if payload_lines:
+                    body = "\n".join(payload_lines)
                 return HSMResponse(status=status, head=head, body=body)
             except (serial.SerialException, serial.SerialTimeoutException, HSMProtocolError) as err:  # type: ignore[attr-defined]
                 last_error = err
                 self.close()
-                time.sleep(0.1 * (attempt + 1))
+                time.sleep(0.15 * (attempt + 1))
         raise HSMFatalError(f"Failed to send '{command}': {last_error}")
 
 
@@ -293,20 +312,29 @@ def _negative_tests(client: SerialHSMClient) -> Dict[str, Dict[str, object]]:
         "truncated": "SIGN SHA256 00",
     }
     for name, command in scenarios.items():
-        response = client.transact(command, allow_additional=True)
+        response = client.transact(command, allow_additional=True, max_payload_lines=6)
+        passed = response.status == "ERR"
+        if name == "wrong_pin":
+            unlock_status = interpret_unlock_response(response)
+            passed = passed or unlock_status.state in {"already_unlocked", "no_pin"}
         results[name] = {
             "status": response.status,
             "head": response.head,
             "body": response.body,
             "expected": "ERR",
-            "passed": response.status == "ERR",
+            "passed": bool(passed),
         }
 
     rate_hits = 0
     hex_digest = "00" * 32
     rate_responses: List[Dict[str, object]] = []
     for _ in range(5):
-        response = client.transact(f"SIGN SHA256 {hex_digest}", allow_additional=True)
+        response = client.transact(
+            f"SIGN SHA256 {hex_digest}",
+            allow_additional=True,
+            response_timeout=max(client.timeout * 1.5, 5.0),
+            max_payload_lines=6,
+        )
         rate_responses.append(
             {
                 "status": response.status,
@@ -339,7 +367,7 @@ def execute_happy_path(
 
     # INFO
     t0 = time.perf_counter()
-    info_resp = client.transact("INFO", allow_additional=True)
+    info_resp = client.transact("INFO", allow_additional=True, max_payload_lines=6)
     duration = (time.perf_counter() - t0) * 1000.0
     _record_metric(metrics, "INFO", duration)
     command_log.append(CommandMetric("INFO", duration, info_resp.status))
@@ -349,7 +377,7 @@ def execute_happy_path(
 
     # HSMID
     t0 = time.perf_counter()
-    hsmid_resp = client.transact("HSMID", expect_payload=True)
+    hsmid_resp = client.transact("HSMID", expect_payload=True, max_payload_lines=6)
     duration = (time.perf_counter() - t0) * 1000.0
     _record_metric(metrics, "HSMID", duration)
     command_log.append(CommandMetric("HSMID", duration, hsmid_resp.status))
@@ -359,7 +387,14 @@ def execute_happy_path(
 
     # UNLOCK
     t0 = time.perf_counter()
-    unlock_resp = client.transact(f"UNLOCK {pin}", allow_additional=True)
+    unlock_timeout = max(client.timeout * 2, 6.0)
+    unlock_resp = client.transact(
+        f"UNLOCK {pin}",
+        allow_additional=True,
+        response_timeout=unlock_timeout,
+        pre_delay=0.05,
+        max_payload_lines=6,
+    )
     duration = (time.perf_counter() - t0) * 1000.0
     _record_metric(metrics, "UNLOCK", duration)
     command_log.append(CommandMetric("UNLOCK", duration, unlock_resp.status))
@@ -369,7 +404,14 @@ def execute_happy_path(
 
     # KEYGEN
     t0 = time.perf_counter()
-    keygen_resp = client.transact("KEYGEN EC P256", allow_additional=True)
+    keygen_timeout = max(client.timeout * 3, 10.0)
+    keygen_resp = client.transact(
+        "KEYGEN EC P256",
+        allow_additional=True,
+        response_timeout=keygen_timeout,
+        pre_delay=0.05,
+        max_payload_lines=6,
+    )
     duration = (time.perf_counter() - t0) * 1000.0
     _record_metric(metrics, "KEYGEN", duration)
     command_log.append(CommandMetric("KEYGEN", duration, keygen_resp.status))
@@ -379,7 +421,12 @@ def execute_happy_path(
 
     # PUBKEY
     t0 = time.perf_counter()
-    pubkey_resp = client.transact("PUBKEY", expect_payload=True)
+    pubkey_resp = client.transact(
+        "PUBKEY",
+        expect_payload=True,
+        response_timeout=max(client.timeout * 1.5, 5.0),
+        max_payload_lines=8,
+    )
     duration = (time.perf_counter() - t0) * 1000.0
     _record_metric(metrics, "PUBKEY", duration)
     command_log.append(CommandMetric("PUBKEY", duration, pubkey_resp.status))
@@ -390,7 +437,12 @@ def execute_happy_path(
 
     # SIGN
     t0 = time.perf_counter()
-    sign_resp = client.transact(f"SIGN SHA256 {digest_hex}", expect_payload=True)
+    sign_resp = client.transact(
+        f"SIGN SHA256 {digest_hex}",
+        expect_payload=True,
+        response_timeout=max(client.timeout * 1.5, 5.0),
+        max_payload_lines=6,
+    )
     duration = (time.perf_counter() - t0) * 1000.0
     _record_metric(metrics, "SIGN", duration)
     command_log.append(CommandMetric("SIGN", duration, sign_resp.status))

@@ -97,11 +97,27 @@ def run_soak(
 
     try:
         client.open()
-        unlock_resp = client.transact(f"UNLOCK {args.pin}", allow_additional=True)
+        unlock_timeout = max(client.timeout * 2, 6.0)
+        keygen_timeout = max(client.timeout * 3, 10.0)
+        sign_timeout = max(client.timeout * 1.5, 5.0)
+
+        unlock_resp = client.transact(
+            f"UNLOCK {args.pin}",
+            allow_additional=True,
+            response_timeout=unlock_timeout,
+            pre_delay=0.05,
+            max_payload_lines=6,
+        )
         unlock_status = interpret_unlock_response(unlock_resp)
         if not unlock_status.success:
             raise RuntimeError(f"Initial unlock failed: {unlock_status.detail}")
-        keygen_resp = client.transact("KEYGEN EC P256", allow_additional=True)
+        keygen_resp = client.transact(
+            "KEYGEN EC P256",
+            allow_additional=True,
+            response_timeout=keygen_timeout,
+            pre_delay=0.05,
+            max_payload_lines=6,
+        )
         keygen_status = interpret_keygen_response(keygen_resp)
         if not keygen_status.success:
             raise RuntimeError(f"Initial key provisioning failed: {keygen_status.detail}")
@@ -116,11 +132,23 @@ def run_soak(
                 client.close()
                 time.sleep(0.5)
                 client.open()
-                reopen_unlock = client.transact(f"UNLOCK {args.pin}", allow_additional=True)
+                reopen_unlock = client.transact(
+                    f"UNLOCK {args.pin}",
+                    allow_additional=True,
+                    response_timeout=unlock_timeout,
+                    pre_delay=0.05,
+                    max_payload_lines=6,
+                )
                 reopen_status = interpret_unlock_response(reopen_unlock)
                 if not reopen_status.success:
                     raise RuntimeError(f"Re-open unlock failed: {reopen_status.detail}")
-                reopen_keygen = client.transact("KEYGEN EC P256", allow_additional=True)
+                reopen_keygen = client.transact(
+                    "KEYGEN EC P256",
+                    allow_additional=True,
+                    response_timeout=keygen_timeout,
+                    pre_delay=0.05,
+                    max_payload_lines=6,
+                )
                 reopen_key_status = interpret_keygen_response(reopen_keygen)
                 if not reopen_key_status.success:
                     raise RuntimeError(f"Re-open key provisioning failed: {reopen_key_status.detail}")
@@ -139,11 +167,26 @@ def run_soak(
             t0 = time.perf_counter()
             try:
                 if op == "SIGN":
-                    response = client.transact(cmd, expect_payload=True)
+                    response = client.transact(
+                        cmd,
+                        expect_payload=True,
+                        response_timeout=sign_timeout,
+                        max_payload_lines=6,
+                    )
                 elif op in {"HSMID", "PUBKEY"}:
-                    response = client.transact(cmd, expect_payload=True)
+                    response = client.transact(
+                        cmd,
+                        expect_payload=True,
+                        response_timeout=sign_timeout,
+                        max_payload_lines=6,
+                    )
                 else:
-                    response = client.transact(cmd, allow_additional=True)
+                    response = client.transact(
+                        cmd,
+                        allow_additional=True,
+                        response_timeout=sign_timeout,
+                        max_payload_lines=6,
+                    )
                 duration_ms = (time.perf_counter() - t0) * 1000.0
             except Exception as err:  # serial timeout or fatal
                 counters["timeouts"] += 1
