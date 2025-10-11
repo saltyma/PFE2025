@@ -559,6 +559,9 @@ def run_sequence(args: argparse.Namespace) -> int:
         "psutil_available": psutil is not None,
         "cryptography_available": _CRYPTO_IMPORT_ERROR is None,
     }
+    metadata["unlock_attempts"] = args.unlock_attempts
+    metadata["lockout_wait_s"] = args.lockout_wait
+    metadata["locked_retries"] = args.locked_retries
 
     banner: Optional[str] = None
     hsm_id: Optional[str] = None
@@ -582,15 +585,13 @@ def run_sequence(args: argparse.Namespace) -> int:
             }
             for event in client.events
         ]
-
         for run_index in range(1, args.runs + 1):
             logging.info("Starting run %d/%d", run_index, args.runs)
-            attempts_remaining = args.unlock_attempts
 
-            def execute(
+            def send_with_record(
                 cmd: str,
                 *,
-                payload_override: Optional[int] = None,
+                expect_payload: Optional[int] = None,
                 timeout: Optional[float] = None,
                 notes: Optional[List[str]] = None,
             ) -> SerialResponse:
@@ -598,11 +599,12 @@ def run_sequence(args: argparse.Namespace) -> int:
                 issued_at = dt.datetime.now(tz=dt.timezone.utc)
                 response = client.send_command(
                     cmd,
-                    expect_payload=payload_override,
+                    expect_payload=expect_payload,
                     timeout=timeout,
                 )
                 after = resource_probe.snapshot()
                 cpu_time, cpu_user, cpu_system, rss = ResourceProbe.delta(before, after)
+                note_list = list(notes or [])
                 record = CommandRecord(
                     run=run_index,
                     command=cmd,
@@ -615,15 +617,101 @@ def run_sequence(args: argparse.Namespace) -> int:
                     cpu_user_s=cpu_user,
                     cpu_system_s=cpu_system,
                     rss_bytes=rss,
-                    notes=list(notes or []),
+                    notes=note_list,
                 )
                 records.append(record)
                 return response
 
-            # INFO banner (always safe)
+            def ensure_unlocked(context: str) -> None:
+                for attempt in range(1, args.unlock_attempts + 1):
+                    logging.info(
+                        "Ensuring device is unlocked (%s) attempt %d/%d",
+                        context,
+                        attempt,
+                        args.unlock_attempts,
+                    )
+                    try:
+                        resp = send_with_record(
+                            f"UNLOCK {args.pin}",
+                            timeout=args.long_timeout,
+                            notes=[f"context={context}", f"unlock_attempt={attempt}"],
+                        )
+                    except TimeoutError as exc:
+                        logging.warning(
+                            "Unlock attempt %d timed out (context=%s): %s",
+                            attempt,
+                            context,
+                            exc,
+                        )
+                        time.sleep(args.lockout_wait)
+                        continue
+                    except RuntimeError as exc:
+                        raise RuntimeError(f"Serial error while unlocking: {exc}") from exc
+
+                    status = resp.status.upper()
+                    code = resp.code.upper()
+                    if status == "OK" and code in {"UNLOCKED", "NEWPIN"}:
+                        logging.info("Device unlocked via %s (context=%s)", code, context)
+                        return
+                    if status == "ERR" and code == "LOCKED":
+                        logging.warning(
+                            "Device reports LOCKED during unlock (context=%s); waiting %.1fs",
+                            context,
+                            args.lockout_wait,
+                        )
+                        time.sleep(args.lockout_wait)
+                        continue
+                    if status == "ERR" and code == "BADPIN":
+                        raise RuntimeError("Device rejected supplied PIN (BADPIN)")
+                    raise RuntimeError(f"Unexpected unlock response: {resp.status} {resp.code}")
+
+                raise RuntimeError(
+                    f"Failed to unlock device after {args.unlock_attempts} attempts (context={context})"
+                )
+
+            def execute(
+                cmd: str,
+                *,
+                payload_override: Optional[int] = None,
+                timeout: Optional[float] = None,
+                notes: Optional[List[str]] = None,
+                auto_unlock: bool = True,
+            ) -> SerialResponse:
+                locked_retries_remaining = max(args.locked_retries, 0)
+                attempt = 1
+                while True:
+                    attempt_notes = list(notes or [])
+                    attempt_notes.append(f"attempt={attempt}")
+                    response = send_with_record(
+                        cmd,
+                        expect_payload=payload_override,
+                        timeout=timeout,
+                        notes=attempt_notes,
+                    )
+                    status = response.status.upper()
+                    code = response.code.upper()
+                    if (
+                        auto_unlock
+                        and status == "ERR"
+                        and code == "LOCKED"
+                        and locked_retries_remaining > 0
+                    ):
+                        retry_index = args.locked_retries - locked_retries_remaining + 1
+                        locked_retries_remaining -= 1
+                        logging.info(
+                            "%s reported LOCKED; auto-unlocking for retry %d (remaining retries: %d)",
+                            cmd,
+                            retry_index,
+                            locked_retries_remaining,
+                        )
+                        ensure_unlocked(f"{cmd} retry {retry_index}")
+                        attempt += 1
+                        continue
+                    return response
+
             if run_index == 1 or args.repeat_info:
                 try:
-                    resp = execute("INFO")
+                    resp = execute("INFO", auto_unlock=False)
                     if resp.status == "OK":
                         banner = resp.code
                 except Exception as exc:
@@ -642,103 +730,44 @@ def run_sequence(args: argparse.Namespace) -> int:
                         fatal_error=str(exc),
                     )
 
-            # Ping the device – will inform whether locked.
             try:
-                resp = execute("PING")
-            except TimeoutError as exc:
-                logging.warning("Initial PING timed out, retrying after unlock attempt: %s", exc)
-                resp = SerialResponse(status="ERR", code="LOCKED", payload=[], raw_lines=[], duration_s=0.0)
+                ensure_unlocked(f"run{run_index}-preflight")
+            except Exception as exc:
+                logging.exception("Unable to unlock device: %s", exc)
+                return finalize(
+                    records,
+                    metadata,
+                    transcript,
+                    out_dir,
+                    banner,
+                    hsm_id,
+                    pubkey_b64,
+                    signature_b64,
+                    digest_hex,
+                    args,
+                    fatal_error=str(exc),
+                )
 
-            if resp.status == "ERR" and resp.code.upper() == "LOCKED":
-                # Attempt to unlock with configured PIN.
-                unlocked = False
-                while attempts_remaining > 0 and not unlocked:
-                    attempt_index = args.unlock_attempts - attempts_remaining + 1
-                    logging.info(
-                        "Attempting to unlock (attempt %d of %d)",
-                        attempt_index,
-                        args.unlock_attempts,
-                    )
-                    attempts_remaining -= 1
-                    try:
-                        unlock_response = execute(
-                            f"UNLOCK {args.pin}",
-                            timeout=args.long_timeout,
-                        )
-                    except TimeoutError as exc:
-                        logging.warning("Unlock timed out; waiting %.1fs before retry", args.lockout_wait)
-                        time.sleep(args.lockout_wait)
-                        continue
-                    if unlock_response.status == "OK" and unlock_response.code.upper() in {"UNLOCKED", "NEWPIN"}:
-                        unlocked = True
-                        logging.info("Device unlocked (%s)", unlock_response.code)
-                    elif unlock_response.status == "ERR" and unlock_response.code.upper() == "LOCKED":
-                        logging.warning("Device reports LOCKED; sleeping %.1fs", args.lockout_wait)
-                        time.sleep(args.lockout_wait)
-                    elif unlock_response.status == "ERR" and unlock_response.code.upper() == "BADPIN":
-                        logging.error("Provided PIN was rejected")
-                        return finalize(
-                            records,
-                            metadata,
-                            transcript,
-                            out_dir,
-                            banner,
-                            hsm_id,
-                            pubkey_b64,
-                            signature_b64,
-                            digest_hex,
-                            args,
-                            fatal_error="Device rejected supplied PIN",
-                        )
-                    else:
-                        logging.error("Unexpected unlock response: %s %s", unlock_response.status, unlock_response.code)
-                        return finalize(
-                            records,
-                            metadata,
-                            transcript,
-                            out_dir,
-                            banner,
-                            hsm_id,
-                            pubkey_b64,
-                            signature_b64,
-                            digest_hex,
-                            args,
-                            fatal_error=f"Unexpected unlock response: {unlock_response.status} {unlock_response.code}",
-                        )
+            try:
+                ping_resp = execute("PING", auto_unlock=False, notes=["post_unlock_probe"])
+                if ping_resp.status != "OK":
+                    raise RuntimeError(f"PING returned {ping_resp.status} {ping_resp.code}")
+            except Exception as exc:
+                logging.exception("PING command failed: %s", exc)
+                return finalize(
+                    records,
+                    metadata,
+                    transcript,
+                    out_dir,
+                    banner,
+                    hsm_id,
+                    pubkey_b64,
+                    signature_b64,
+                    digest_hex,
+                    args,
+                    fatal_error=str(exc),
+                )
 
-                if not unlocked:
-                    return finalize(
-                        records,
-                        metadata,
-                        transcript,
-                        out_dir,
-                        banner,
-                        hsm_id,
-                        pubkey_b64,
-                        signature_b64,
-                        digest_hex,
-                        args,
-                        fatal_error="Failed to unlock device after retries",
-                    )
-
-                # Reconfirm connectivity post-unlock.
-                resp = execute("PING")
-                if resp.status != "OK":
-                    return finalize(
-                        records,
-                        metadata,
-                        transcript,
-                        out_dir,
-                        banner,
-                        hsm_id,
-                        pubkey_b64,
-                        signature_b64,
-                        digest_hex,
-                        args,
-                        fatal_error=f"PING after unlock failed: {resp.status} {resp.code}",
-                    )
-
-            # Acquire HSMID once per run for traceability
             try:
                 resp = execute("HSMID")
                 if resp.status == "OK" and resp.payload:
@@ -760,11 +789,15 @@ def run_sequence(args: argparse.Namespace) -> int:
                     fatal_error=str(exc),
                 )
 
-            # Ensure key material is present
             try:
                 resp = execute("KEYGEN EC P256", timeout=args.long_timeout)
                 if resp.status != "OK":
-                    logging.warning("KEYGEN returned %s %s", resp.status, resp.code)
+                    raise RuntimeError(f"KEYGEN returned {resp.status} {resp.code}")
+                code_upper = resp.code.upper()
+                if code_upper == "KEYEXISTS":
+                    logging.info("Device reports existing key material; continuing with benchmark")
+                elif code_upper != "KEYGEN":
+                    logging.info("KEYGEN reported %s", resp.code)
             except Exception as exc:
                 logging.exception("KEYGEN failed: %s", exc)
                 return finalize(
@@ -781,12 +814,12 @@ def run_sequence(args: argparse.Namespace) -> int:
                     fatal_error=str(exc),
                 )
 
-            # Retrieve public key
             try:
                 resp = execute("PUBKEY")
-                if resp.status == "OK" and resp.payload:
-                    pubkey_b64 = resp.payload[0]
-                    (out_dir / "hsm_pubkey.b64").write_text(pubkey_b64 + "\n", encoding="utf-8")
+                if resp.status != "OK" or not resp.payload:
+                    raise RuntimeError(f"PUBKEY returned {resp.status} {resp.code}")
+                pubkey_b64 = resp.payload[0]
+                (out_dir / "hsm_pubkey.b64").write_text(pubkey_b64 + "\n", encoding="utf-8")
             except Exception as exc:
                 logging.exception("PUBKEY failed: %s", exc)
                 return finalize(
@@ -803,13 +836,13 @@ def run_sequence(args: argparse.Namespace) -> int:
                     fatal_error=str(exc),
                 )
 
-            # Perform a signature benchmark
             sign_cmd = f"SIGN SHA256 {digest_hex}"
             try:
                 resp = execute(sign_cmd, timeout=args.long_timeout)
-                if resp.status == "OK" and resp.payload:
-                    signature_b64 = resp.payload[0]
-                    (out_dir / "hsm_signature.b64").write_text(signature_b64 + "\n", encoding="utf-8")
+                if resp.status != "OK" or not resp.payload:
+                    raise RuntimeError(f"SIGN returned {resp.status} {resp.code}")
+                signature_b64 = resp.payload[0]
+                (out_dir / "hsm_signature.b64").write_text(signature_b64 + "\n", encoding="utf-8")
             except Exception as exc:
                 logging.exception("SIGN failed: %s", exc)
                 return finalize(
@@ -828,7 +861,7 @@ def run_sequence(args: argparse.Namespace) -> int:
 
             if args.logout_between_runs:
                 try:
-                    execute("LOGOUT")
+                    execute("LOGOUT", auto_unlock=False)
                 except Exception as exc:
                     logging.warning("LOGOUT failed: %s", exc)
 
@@ -904,6 +937,7 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     parser.add_argument("--long-timeout", type=float, default=30.0, help="Timeout in seconds for long operations (unlock/keygen/sign)")
     parser.add_argument("--lockout-wait", type=float, default=35.0, help="Seconds to wait after LOCKED responses before retrying unlock")
     parser.add_argument("--unlock-attempts", type=int, default=5, help="Maximum unlock attempts before aborting")
+    parser.add_argument("--locked-retries", type=int, default=2, help="Automatic retries for a command after re-unlocking when LOCKED is returned (default: %(default)s)")
     parser.add_argument("--handshake-timeout", type=float, default=6.0, help="Seconds to harvest READY banners after opening the port")
     parser.add_argument("--serial-read-timeout", type=float, default=0.5, help="Readline timeout when waiting for data")
     parser.add_argument("--logout-between-runs", action="store_true", help="Issue LOGOUT between runs to measure cold unlock performance")
