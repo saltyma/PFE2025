@@ -1,4 +1,17 @@
-# CertiFlow Platform & STM32U5 HSM Firmware
+# CertiFlow – Secure Local PKI & Hardware Signing
+
+CertiFlow is a hardware-anchored PKI signing infrastructure combining:
+• A custom hardware signing module (HSM)
+• Local certificate authority and CRL management
+• Offline signature verification
+• Audit logging and trust boundaries
+
+It demonstrates private-key isolation, offline trust, and DFIR-oriented auditability
+in a fully local environment.
+
+📄 Technical Whitepaper: docs/CertiFlow-Technical-Report.pdf
+
+---
 
 CertiFlow couples a desktop certificate-authority workflow with a dedicated STM32U5-based
 hardware security module (HSM). The repository contains two major deliverables:
