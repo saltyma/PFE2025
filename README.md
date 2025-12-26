@@ -9,7 +9,7 @@ CertiFlow is a hardware-anchored PKI signing infrastructure combining:
 It demonstrates private-key isolation, offline trust, and DFIR-oriented auditability
 in a fully local environment.
 
-📄 Technical Whitepaper: docs/CertiFlow-Technical-Report.pdf
+📄 **Technical Whitepaper (PDF):** [CertiFlow-Technical-Report.pdf](docs/CertiFlow-Technical-Report.pdf)
 
 ---
 
