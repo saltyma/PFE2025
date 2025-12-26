@@ -11,6 +11,13 @@ in a fully local environment.
 
 📄 **Technical Whitepaper (PDF):** [CertiFlow-Technical-Report.pdf](docs/CertiFlow-Technical-Report.pdf)
 
+## Architecture (High Level)
+
+![CertiFlow Architecture](docs/assets/certiflow-architecture.png)
+
+This diagram shows the trust domains, audit boundaries, certificate lifecycle,
+and offline verification flows implemented by CertiFlow.
+
 ---
 
 CertiFlow couples a desktop certificate-authority workflow with a dedicated STM32U5-based
